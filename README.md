@@ -25,7 +25,7 @@ and to the workflow run's artifacts.
 
 ```sh
 git clone -b r2g --recurse-submodules https://github.com/MechboardsLTD/vial-qmk.git ~/vial-qmk
-git clone https://github.com/<you>/qmk_userspace.git ~/qmk_userspace
+git clone https://github.com/sidtuladhar/qmk-userspace.git ~/qmk_userspace
 
 qmk config user.qmk_home="$HOME/vial-qmk"
 qmk config user.overlay_dir="$HOME/qmk_userspace"
