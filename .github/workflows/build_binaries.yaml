@@ -2,20 +2,122 @@ name: Build QMK firmware
 
 on: [push, workflow_dispatch]
 
-permissions:
-  contents: write
+# Runs on the same branch wait for each other instead of overlapping, so an
+# older run can never publish over a newer one. Nothing is cancelled midway.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
 
+env:
+  # Mechboards' Vial fork: the Sofle Pro R2G and Vial only exist here.
+  # Pinned to a commit so a rebuild uses the same code. To pick up new
+  # Mechboards changes, set this to the new head of their r2g branch.
+  VIAL_QMK_REPO: MechboardsLTD/vial-qmk
+  VIAL_QMK_REF: 1bf4f3183a8d05ef2ff1010a61740071bfa69139 # r2g, 2026-10-16
+
+permissions: {}
+
+# Steps follow qmk/.github's qmk_userspace_build/publish workflows, copied here
+# so the container and every action can be pinned (they float in the shared
+# workflows).
 jobs:
   build:
-    name: 'QMK Userspace Build'
-    uses: qmk/.github/.github/workflows/qmk_userspace_build.yml@main
-    with:
-      # Mechboards' Vial fork: the Sofle Pro R2G and Vial only exist here
-      qmk_repo: MechboardsLTD/vial-qmk
-      qmk_ref: r2g
+    name: Build firmware
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    # ghcr.io/qmk/qmk_cli:latest as of 2026-11-06
+    container: ghcr.io/qmk/qmk_cli@sha256:b7d7fa8fb4432b569931de5ad59098cb788f440ed61a62c5126746b71aee0f4a
+    steps:
+      - name: Checkout userspace
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+
+      - name: Checkout vial-qmk
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          repository: ${{ env.VIAL_QMK_REPO }}
+          ref: ${{ env.VIAL_QMK_REF }}
+          path: qmk_firmware
+          submodules: recursive
+
+      - name: Install QMK CLI dependencies
+        run: pip install -r qmk_firmware/requirements.txt
+
+      - name: Configure QMK CLI
+        run: |
+          qmk config userspace_compile.parallel=$(nproc)
+          qmk config user.qmk_home=$GITHUB_WORKSPACE/qmk_firmware
+          qmk config user.overlay_dir=$GITHUB_WORKSPACE
+
+      - name: Validate userspace
+        run: qmk userspace-doctor
+
+      - name: Build
+        run: |
+          if qmk userspace-compile --help | grep -q "print-failures"; then
+              EXTRA_ARGS="-p"
+          fi
+          qmk userspace-compile -e DUMP_CI_METADATA=yes $EXTRA_ARGS || touch .failed
+          ./qmk_firmware/util/ci/generate_failure_markdown.sh > $GITHUB_STEP_SUMMARY || true
+          # GitHub caps the step summary at 1MB
+          truncate --size='<960K' $GITHUB_STEP_SUMMARY || true
+          [ ! -f .failed ] || exit 1
+
+      - name: Upload firmware
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: Firmware
+          path: '*.uf2'
+          if-no-files-found: error
 
   publish:
-    name: 'QMK Userspace Publish'
-    uses: qmk/.github/.github/workflows/qmk_userspace_publish.yml@main
-    if: always() && !cancelled()
+    name: Publish releases
     needs: build
+    # Only main publishes, and only after a successful build. Other branches
+    # still build, but their firmware never reaches the releases.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Download firmware
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: Firmware
+
+      # Kept permanently, so older firmware stays downloadable.
+      - name: Publish numbered release
+        uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: Firmware build ${{ github.run_number }}
+          target_commitish: ${{ github.sha }}
+          body: |
+            Userspace commit: ${{ github.sha }}
+            vial-qmk commit: ${{ env.VIAL_QMK_REF }}
+          files: '*.uf2'
+          fail_on_unmatched_files: true
+          make_latest: false
+
+      # `latest` always points at the newest build: delete it, then recreate
+      # it on this commit.
+      - name: Remove previous latest release
+        run: gh release delete latest --cleanup-tag --yes || true
+
+      - name: Publish latest release
+        uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
+        with:
+          tag_name: latest
+          name: Latest QMK Firmware
+          target_commitish: ${{ github.sha }}
+          body: |
+            Same firmware as build-${{ github.run_number }}.
+
+            Userspace commit: ${{ github.sha }}
+            vial-qmk commit: ${{ env.VIAL_QMK_REF }}
+          files: '*.uf2'
+          fail_on_unmatched_files: true
+          make_latest: true
