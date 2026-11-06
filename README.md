@@ -43,5 +43,9 @@ Both halves need the same firmware. For each half:
 2. Hold that half's outer top corner key, then plug USB into **that same half**.
 3. `RPI-RP2` mounts; copy `mechboards_sofle_r2g_mine.uf2` onto it.
 
-Flashing resets the Vial keymap (EEPROM), so reload your layout backup in
-Vial afterwards.
+Flashing resets the Vial keymap (EEPROM). Afterwards, load
+[`latest.vil`](keyboards/mechboards/sofle/r2g/keymaps/mine/latest.vil) in Vial
+(File → Load saved layout).
+
+After changing the layout in Vial, save it over that file (File → Save current
+layout) and commit it, so the backup stays current.
