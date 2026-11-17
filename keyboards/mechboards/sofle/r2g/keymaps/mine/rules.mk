@@ -3,6 +3,7 @@ VIA_ENABLE = yes
 VIAL_ENABLE = yes
 VIALRGB_ENABLE = yes
 AUTOCORRECT_ENABLE = yes # QMK's built-in typo list
+DEBOUNCE_TYPE = sym_defer_pk # per-key; DEBOUNCE ms set in config.h
 SRC += settings_menu.c   # right-screen settings menu
 SRC += debug_perf.c      # per-stage timing for the menu's Debug page
 OPT_DEFS += -DDEBUG_PERF_ENABLE

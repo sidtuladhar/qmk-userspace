@@ -8,3 +8,8 @@
 #define VIAL_UNLOCK_COMBO_COLS {0, 1}
 
 #define SPLIT_TRANSACTION_IDS_USER KEYGLOW_SYNC, MENU_SYNC // keyglow + settings_menu.c
+
+// Per-key deferred debounce (DEBOUNCE_TYPE in rules.mk): a key must stay
+// down before it registers, so brief finger brushes are dropped. The timer
+// ticks in whole ms, so 8 means a real wait of 7-8 ms (about 7.5 on average).
+#define DEBOUNCE 8
