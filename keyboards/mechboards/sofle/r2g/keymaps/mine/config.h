@@ -13,3 +13,6 @@
 // down before it registers, so brief finger brushes are dropped. The timer
 // ticks in whole ms, so 8 means a real wait of 7-8 ms (about 7.5 on average).
 #define DEBOUNCE 8
+
+// Lighting effect after a full reset, and after each new flash (keymap.c display_init_user).
+#define RGB_MATRIX_DEFAULT_MODE RGB_MATRIX_BREATHING

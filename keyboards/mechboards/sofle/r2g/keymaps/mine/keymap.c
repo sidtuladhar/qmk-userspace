@@ -97,11 +97,12 @@ static uint32_t               pika_oneshot_start;
 static const char   *layer_names[] = {"Base", "Lower", "Raise", "Adjust"};
 static const uint8_t layer_hues[]  = {170, 85, 0, 213};
 
-static bool ac_enable_after_reset;
+static bool new_build_boot; // first boot of a newly flashed build, see via_init_kb() below
 
 bool display_init_user(void) {
-    if (ac_enable_after_reset) {
-        autocorrect_enable(); // see via_init_kb() below
+    if (new_build_boot) {
+        autocorrect_enable();                     // Vial's reset switched it off
+        rgb_matrix_mode(RGB_MATRIX_DEFAULT_MODE); // breathing, set in config.h
     }
     pika_img[PIKA_SIT]   = qp_load_image_mem(gfx_pika_sit);
     pika_img[PIKA_WALK]  = qp_load_image_mem(gfx_pika_walk);
@@ -183,9 +184,10 @@ bool process_autocorrect_user(uint16_t *keycode, keyrecord_t *record, uint8_t *t
 // qmk_settings_reset), which zeroes keymap_config and so switches autocorrect off.
 // via_init_kb() runs just before that reset, so note it here and switch autocorrect back
 // on once boot finishes (display_init_user, called from r2g.c's keyboard_post_init_kb).
-// An AC_TOGG off still persists until the next flash.
+// The same boot also puts the lights back to the default effect (breathing). Changes
+// made in Vial (AC_TOGG off, another effect) still persist until the next flash.
 void via_init_kb(void) {
-    ac_enable_after_reset = !via_eeprom_is_valid();
+    new_build_boot = !via_eeprom_is_valid();
 }
 
 static uint8_t pika_pick_state(void) {
